@@ -7,6 +7,10 @@ import google_db # スプレッドシート接続用
 st.set_page_config(page_title="登場人物DB（クラウド版）", layout="wide")
 st.title("☁️ 登場人物データベース (Google Sheets)")
 
+# ==========================================
+# ★ここが修正ポイント！ (初期化と伝言チェック)
+# ==========================================
+
 # セッションステート初期化
 if "current_mode" not in st.session_state:
     st.session_state.current_mode = "全キャラ一覧"
@@ -15,6 +19,17 @@ if "editing_id" not in st.session_state:
 if "char_cache" not in st.session_state:
     st.session_state.char_cache = [] 
 if "new_uuid" not in st.session_state:
+    st.session_state.new_uuid = str(uuid.uuid4())
+# 保存完了フラグの初期化
+if "save_success_flag" not in st.session_state:
+    st.session_state.save_success_flag = False
+
+# ★「保存完了したよ」という伝言があれば、ここでモードを切り替える
+# (サイドバーが表示される前に行うのがコツ！)
+if st.session_state.save_success_flag:
+    st.session_state.current_mode = "全キャラ一覧"
+    st.session_state.save_success_flag = False # 伝言を消す
+    # IDもリセット
     st.session_state.new_uuid = str(uuid.uuid4())
 
 # --- ヘルパー関数 ---
@@ -27,10 +42,9 @@ def go_to_edit(char_id):
     st.session_state.editing_id = char_id
     st.session_state.current_mode = "既存キャラの編集"
 
-# ★ここが魔法のコード！GoogleドライブのURLを表示用に変換する関数
+# 画像URL変換関数
 def format_image_url(url):
     if not url: return None
-    # Google Driveの共有リンクなら変換
     if "drive.google.com" in url and "/d/" in url:
         try:
             file_id = url.split("/d/")[1].split("/")[0]
@@ -106,9 +120,7 @@ if operation == "全キャラ一覧":
         for idx, char in enumerate(df_list):
             with cols[idx % 4]:
                 with st.container(border=True):
-                    # ★ここで魔法を使う
                     img_url = format_image_url(char["画像"])
-                    
                     if img_url:
                         st.image(img_url, use_container_width=True)
                     else:
@@ -183,7 +195,6 @@ else:
             st.caption("※Googleドライブの「リンクを知っている全員」の共有リンクを貼ってください")
             image_input = st.text_input("画像URL", value=get_val(["profile"], "image_file", ""))
             
-            # ★ここでも魔法を使う
             image_url = format_image_url(image_input)
 
             if image_url:
@@ -387,12 +398,10 @@ else:
                 st.success("保存完了！")
                 st.cache_data.clear() # キャッシュクリア
                 
-                # 新規作成ならIDリセット
-                if operation == "新規作成":
-                    st.session_state.new_uuid = str(uuid.uuid4())
-                    st.session_state.current_mode = "全キャラ一覧"
+                # ★ここを変更！直接 current_mode を変えるのではなく、フラグを立てる
+                st.session_state.save_success_flag = True
                 
                 load_data() 
-                st.rerun()
+                st.rerun() # リロード（リロード後、一番上でフラグを検知して画面が切り替わる）
             else:
                 st.error("保存に失敗しました。接続設定を確認してください。")
