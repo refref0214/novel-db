@@ -13,7 +13,7 @@ if "current_mode" not in st.session_state:
 if "editing_id" not in st.session_state:
     st.session_state.editing_id = None
 if "char_cache" not in st.session_state:
-    st.session_state.char_cache = [] # データを一時保存して高速化
+    st.session_state.char_cache = [] 
 if "new_uuid" not in st.session_state:
     st.session_state.new_uuid = str(uuid.uuid4())
 
@@ -26,6 +26,18 @@ def load_data():
 def go_to_edit(char_id):
     st.session_state.editing_id = char_id
     st.session_state.current_mode = "既存キャラの編集"
+
+# ★ここが魔法のコード！GoogleドライブのURLを表示用に変換する関数
+def format_image_url(url):
+    if not url: return None
+    # Google Driveの共有リンクなら変換
+    if "drive.google.com" in url and "/d/" in url:
+        try:
+            file_id = url.split("/d/")[1].split("/")[0]
+            return f"https://drive.google.com/uc?id={file_id}"
+        except:
+            return url
+    return url
 
 # --- サイドバー ---
 st.sidebar.header("メニュー")
@@ -94,7 +106,9 @@ if operation == "全キャラ一覧":
         for idx, char in enumerate(df_list):
             with cols[idx % 4]:
                 with st.container(border=True):
-                    img_url = char["画像"]
+                    # ★ここで魔法を使う
+                    img_url = format_image_url(char["画像"])
+                    
                     if img_url:
                         st.image(img_url, use_container_width=True)
                     else:
@@ -156,7 +170,7 @@ else:
         return d.get(key, default)
 
     # ==========================
-    # 入力フォーム (ローカル版と完全一致)
+    # 入力フォーム
     # ==========================
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["基本プロフィール", "年表(履歴)", "外見・環境・性格等", "喜怒哀楽", "人生における作品の位置"])
 
@@ -166,11 +180,14 @@ else:
         
         with col1:
             st.markdown("#### 顔写真")
-            st.caption("※Googleドライブの画像の共有リンクなどを貼ってください")
-            image_file = st.text_input("画像URL", value=get_val(["profile"], "image_file", ""))
+            st.caption("※Googleドライブの「リンクを知っている全員」の共有リンクを貼ってください")
+            image_input = st.text_input("画像URL", value=get_val(["profile"], "image_file", ""))
             
-            if image_file:
-                st.image(image_file, use_container_width=True, caption="プレビュー")
+            # ★ここでも魔法を使う
+            image_url = format_image_url(image_input)
+
+            if image_url:
+                st.image(image_url, use_container_width=True, caption="プレビュー")
             else:
                 st.info("画像なし")
 
@@ -266,7 +283,6 @@ else:
 
     # --- Tab 4: 喜怒哀楽 ---
     with tab4:
-        # ★ここをローカル版の質問文に完全に戻しました
         q_joy = "この人物が作品に登場するまでの人生でいちばん嬉しかったことはなんですか"
         ans_joy = st.text_area(q_joy, value=get_val(["emotions"], q_joy, ""), height=150)
 
@@ -284,7 +300,6 @@ else:
 
     # --- Tab 5: 人生における作品の位置 ---
     with tab5:
-        # ★ここもローカル版の質問文に戻しました
         q_role1 = "この人物が作品に登場することは、それまでの人生でどんな位置にありますか"
         ans_role1 = st.text_area(q_role1, value=get_val(["story_role"], q_role1, ""), height=100)
 
@@ -318,7 +333,7 @@ else:
                 "profile": {
                     "name": name,
                     "kana": kana,
-                    "image_file": image_file, # URL
+                    "image_file": image_input, # 元のURLを保存
                     "age_info": age_info,
                     "gender": gender,
                     "address": address,
@@ -371,13 +386,13 @@ else:
             if success:
                 st.success("保存完了！")
                 st.cache_data.clear() # キャッシュクリア
+                
                 # 新規作成ならIDリセット
                 if operation == "新規作成":
                     st.session_state.new_uuid = str(uuid.uuid4())
-                    # 新規保存後は一覧に戻るか、編集モードに切り替えるなど
                     st.session_state.current_mode = "全キャラ一覧"
                 
-                load_data() # データ再読み込み
+                load_data() 
                 st.rerun()
             else:
                 st.error("保存に失敗しました。接続設定を確認してください。")
