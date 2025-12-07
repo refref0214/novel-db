@@ -7,7 +7,7 @@ import os
 
 # ★ここにスプレッドシートのID（URLの /d/ と /edit の間の文字列）を貼る
 # ※もしIDが消えていたら、もう一度貼ってね！
-SPREADSHEET_KEY = "ここに長いIDを貼り付けてね"
+SPREADSHEET_KEY = "1l_Fb9McFOb9FZhpsOqIZNmtbCyh0YHlppQ9pF_2kDrY"
 
 # 認証スコープ
 SCOPE = [
