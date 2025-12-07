@@ -6,7 +6,8 @@ import streamlit as st
 import os
 
 # ★ここにスプレッドシートのID（URLの /d/ と /edit の間の文字列）を貼る
-SPREADSHEET_KEY = "1l_Fb9McFOb9FZhpsOqIZNmtbCyh0YHlppQ9pF_2kDrY"
+# ※もしIDが消えていたら、もう一度貼ってね！
+SPREADSHEET_KEY = "ここに長いIDを貼り付けてね"
 
 # 認証スコープ
 SCOPE = [
@@ -22,7 +23,6 @@ def get_connection():
             creds = ServiceAccountCredentials.from_json_keyfile_name("secrets.json", SCOPE)
         # 2. ファイルがなければ、Streamlit Cloudの金庫(secrets)を探す
         elif "gcp_service_account" in st.secrets:
-            # st.secretsは辞書形式なので、辞書から認証情報を作る
             key_dict = dict(st.secrets["gcp_service_account"])
             creds = ServiceAccountCredentials.from_json_keyfile_dict(key_dict, SCOPE)
         else:
@@ -68,6 +68,7 @@ def save_character(char_id, full_data):
         sheet.update_cell(row_idx, 3, image_url)
         sheet.update_cell(row_idx, 4, now)
         sheet.update_cell(row_idx, 5, json_str)
-    except gspread.exceptions.CellNotFound:
+    # ★ここを修正しました！ (exceptions を削除)
+    except gspread.CellNotFound:
         sheet.append_row([str(char_id), name, image_url, now, json_str])
     return True
