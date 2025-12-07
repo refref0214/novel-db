@@ -8,10 +8,8 @@ st.set_page_config(page_title="登場人物DB（クラウド版）", layout="wid
 st.title("☁️ 登場人物データベース (Google Sheets)")
 
 # ==========================================
-# ★ここが修正ポイント！ (初期化と伝言チェック)
+# 初期化
 # ==========================================
-
-# セッションステート初期化
 if "current_mode" not in st.session_state:
     st.session_state.current_mode = "全キャラ一覧"
 if "editing_id" not in st.session_state:
@@ -20,21 +18,16 @@ if "char_cache" not in st.session_state:
     st.session_state.char_cache = [] 
 if "new_uuid" not in st.session_state:
     st.session_state.new_uuid = str(uuid.uuid4())
-# 保存完了フラグの初期化
 if "save_success_flag" not in st.session_state:
     st.session_state.save_success_flag = False
 
-# ★「保存完了したよ」という伝言があれば、ここでモードを切り替える
-# (サイドバーが表示される前に行うのがコツ！)
 if st.session_state.save_success_flag:
     st.session_state.current_mode = "全キャラ一覧"
-    st.session_state.save_success_flag = False # 伝言を消す
-    # IDもリセット
+    st.session_state.save_success_flag = False
     st.session_state.new_uuid = str(uuid.uuid4())
 
 # --- ヘルパー関数 ---
 def load_data():
-    """Googleからデータを再読み込み"""
     with st.spinner('Googleからデータを読み込んでいます...'):
         st.session_state.char_cache = google_db.load_all_characters()
 
@@ -42,41 +35,40 @@ def go_to_edit(char_id):
     st.session_state.editing_id = char_id
     st.session_state.current_mode = "既存キャラの編集"
 
-# ★強力版：GoogleドライブのURL変換関数
+# ★ここを変更！より表示されやすい「thumbnail」APIを使います
 def format_image_url(url):
     if not url: return None
     
-    # すでに変換済みのURL（uc?id=...）ならそのまま返す
-    if "drive.google.com/uc?id=" in url:
+    # 既に変換済みならそのまま
+    if "drive.google.com/thumbnail" in url:
         return url
-        
+
     file_id = None
     
-    # パターン1: .../file/d/【ID】/... の形
-    if "/d/" in url:
+    # パターンA: .../file/d/【ID】/...
+    if "/file/d/" in url:
         try:
-            file_id = url.split("/d/")[1].split("/")[0]
+            part = url.split("/file/d/")[1]
+            file_id = part.split("/")[0]
         except:
             pass
-            
-    # パターン2: ...?id=【ID】... の形
+    # パターンB: ...id=【ID】
     elif "id=" in url:
         try:
-            file_id = url.split("id=")[1].split("&")[0]
+            part = url.split("id=")[1]
+            file_id = part.split("&")[0]
         except:
             pass
             
-    # IDが取れたら、表示用のリンクを作って返す
     if file_id:
-        # export=view をつけるのがコツ
-        return f"https://drive.google.com/uc?export=view&id={file_id}"
+        # sz=w1000 は「横幅1000pxで表示して」という指定
+        return f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"
         
-    # どうしても解析できなかったら元のまま返す
     return url
+
 # --- サイドバー ---
 st.sidebar.header("メニュー")
 
-# リロードボタン
 if st.sidebar.button("🔄 データを更新"):
     st.cache_data.clear()
     load_data()
@@ -88,7 +80,6 @@ operation = st.sidebar.radio(
     key="current_mode"
 )
 
-# 初回起動時にデータをロード
 if not st.session_state.char_cache:
     load_data()
 
@@ -104,7 +95,6 @@ if operation == "全キャラ一覧":
     if not all_chars:
         st.info("データがありません。「新規作成」してください。")
     else:
-        # テーブル用データ作成
         df_list = []
         for c in all_chars:
             prof = c["full_data"].get("profile", {})
@@ -116,7 +106,7 @@ if operation == "全キャラ一覧":
             })
         df_all = pd.DataFrame(df_list)
 
-        # ① リスト表示
+        # ① リスト
         st.subheader("📋 リスト (行を選択して編集)")
         event = st.dataframe(
             df_all[["氏名", "年齢", "ID"]],
@@ -134,7 +124,7 @@ if operation == "全キャラ一覧":
 
         st.markdown("---")
 
-        # ② ギャラリー表示
+        # ② ギャラリー
         st.subheader("🖼️ ギャラリー")
         cols = st.columns(4)
         for idx, char in enumerate(df_list):
@@ -156,12 +146,10 @@ else:
     target_id = None
     
     if operation == "既存キャラの編集":
-        # IDリストを作る
         id_map = {c["ID"]: c["氏名"] for c in all_chars}
         id_list = list(id_map.keys())
         
         if id_list:
-            # セレクトボックス
             index = 0
             if st.session_state.editing_id in id_list:
                 index = id_list.index(st.session_state.editing_id)
@@ -178,8 +166,6 @@ else:
                 on_change=on_change_select
             )
             target_id = selected_id
-            
-            # データを取り出す
             for c in all_chars:
                 if c["ID"] == target_id:
                     current_data = c["full_data"]
@@ -190,10 +176,8 @@ else:
     elif operation == "新規作成":
         st.sidebar.info("新規作成中")
         current_data = {}
-        # 新規ID
         target_id = st.session_state.new_uuid
 
-    # --- データ取得ヘルパー ---
     def get_val(path, key, default=""):
         d = current_data
         for p in path:
@@ -206,19 +190,20 @@ else:
     # ==========================
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["基本プロフィール", "年表(履歴)", "外見・環境・性格等", "喜怒哀楽", "人生における作品の位置"])
 
-    # --- Tab 1: 基本プロフィール ---
     with tab1:
         col1, col2 = st.columns([1, 2])
         
         with col1:
             st.markdown("#### 顔写真")
-            st.caption("※Googleドライブの「リンクを知っている全員」の共有リンクを貼ってください")
+            st.caption("※Googleドライブの共有リンクを貼ってください")
             image_input = st.text_input("画像URL", value=get_val(["profile"], "image_file", ""))
             
             image_url = format_image_url(image_input)
 
             if image_url:
                 st.image(image_url, use_container_width=True, caption="プレビュー")
+                # ★デバッグ用にURLを表示（うまくいったら消してOK）
+                st.caption(f"Debug: {image_url}")
             else:
                 st.info("画像なし")
 
@@ -264,7 +249,6 @@ else:
             key="licenses_editor"
         )
 
-    # --- Tab 2: 年表（無限追加可能） ---
     with tab2:
         st.markdown("### 学歴・職歴・出来事")
         st.info("下の表に直接入力してください。一番下の「＋」で行を追加できます。")
@@ -287,10 +271,8 @@ else:
             key="timeline_editor"
         )
 
-    # --- Tab 3: 外見・環境・性格等 ---
     with tab3:
         col_app, col_env, col_pers = st.columns(3)
-        
         with col_app:
             st.subheader("外見 (Appearance)")
             height = st.text_input("身長", value=get_val(["appearance"], "身長", ""))
@@ -299,129 +281,79 @@ else:
             face = st.text_area("顔の特徴", value=get_val(["appearance"], "顔の特徴", ""))
             medical = st.text_area("既往症", value=get_val(["appearance"], "既往症", ""), help="病歴やアレルギーなど")
             rewards = st.text_area("賞罰", value=get_val(["appearance"], "賞罰", ""), help="受賞歴や前科など")
-            
         with col_env:
             st.subheader("環境 (Environment)")
             family = st.text_area("家族構成", value=get_val(["environment"], "家族構成", ""))
             love = st.text_input("恋人の有無", value=get_val(["environment"], "恋人の有無", ""))
             hobby = st.text_area("趣味", value=get_val(["environment"], "趣味", ""))
             habits = st.text_area("嗜好歴・喫煙・飲酒歴", value=get_val(["environment"], "嗜好", ""))
-
         with col_pers:
             st.subheader("性格 (Personality)")
             strengths = st.text_area("長所", value=get_val(["personality"], "長所", ""), height=150)
             weaknesses = st.text_area("短所", value=get_val(["personality"], "短所", ""), height=150)
 
-    # --- Tab 4: 喜怒哀楽 ---
     with tab4:
         q_joy = "この人物が作品に登場するまでの人生でいちばん嬉しかったことはなんですか"
         ans_joy = st.text_area(q_joy, value=get_val(["emotions"], q_joy, ""), height=150)
-
         q_sad = "この人物が作品に登場するまでの人生でいちばん悲しかったことはなんですか"
         ans_sad = st.text_area(q_sad, value=get_val(["emotions"], q_sad, ""), height=150)
-
         q_anger = "この人物が作品に登場するまでの人生でいちばん怒ったことはなんですか"
         ans_anger = st.text_area(q_anger, value=get_val(["emotions"], q_anger, ""), height=150)
-
         q_fun = "この人物が作品に登場するまでの人生でいちばん楽しかったことはなんですか"
         ans_fun = st.text_area(q_fun, value=get_val(["emotions"], q_fun, ""), height=150)
-
         q_suf = "この人物が作品に登場するまでの人生でいちばん苦しかったことはなんですか"
         ans_suf = st.text_area(q_suf, value=get_val(["emotions"], q_suf, ""), height=150)
 
-    # --- Tab 5: 人生における作品の位置 ---
     with tab5:
         q_role1 = "この人物が作品に登場することは、それまでの人生でどんな位置にありますか"
         ans_role1 = st.text_area(q_role1, value=get_val(["story_role"], q_role1, ""), height=100)
-
         q_role2 = "この人物の、この作品での目的はどんなことですか"
         ans_role2 = st.text_area(q_role2, value=get_val(["story_role"], q_role2, ""), height=100)
-
         q_role3 = "この人物がこれからの人生で最も起こってほしくないことはどんなことですか"
         ans_role3 = st.text_area(q_role3, value=get_val(["story_role"], q_role3, ""), height=100)
-
         q_role4 = "この人物がこれからの人生で最も起きてほしいことはどんなことですか"
         ans_role4 = st.text_area(q_role4, value=get_val(["story_role"], q_role4, ""), height=100)
-
         st.markdown("---")
         st.markdown("### その他")
         q_other = "設定事項（どんなことでも）"
         ans_other = st.text_area(q_other, value=get_val(["others"], "note", ""), height=200)
 
-    # --- 保存ボタン ---
     st.markdown("---")
     if st.button("☁️ Googleスプレッドシートに保存する", type="primary"):
         with st.spinner("保存中..."):
-            # データ整形
             clean_timeline = edited_df.to_dict(orient="records")
             clean_timeline = [row for row in clean_timeline if row["date"] or row["event"]]
-
             clean_licenses = edited_licenses.to_dict(orient="records")
             clean_licenses = [row for row in clean_licenses if row["date"] or row["content"]]
 
-            # 全データ構築
             full_data = {
                 "profile": {
-                    "name": name,
-                    "kana": kana,
-                    "image_file": image_input, # 元のURLを保存
-                    "age_info": age_info,
-                    "gender": gender,
-                    "address": address,
+                    "name": name, "kana": kana, "image_file": image_input,
+                    "age_info": age_info, "gender": gender, "address": address,
                 },
                 "licenses": clean_licenses,
-                "essay": {
-                    "motivation": motivation,
-                    "self_pr": self_pr
-                },
+                "essay": {"motivation": motivation, "self_pr": self_pr},
                 "timeline": clean_timeline,
                 "appearance": {
-                    "身長": height,
-                    "体重": weight,
-                    "髪型": hair,
-                    "顔の特徴": face,
-                    "既往症": medical,
-                    "賞罰": rewards
+                    "身長": height, "体重": weight, "髪型": hair, "顔の特徴": face,
+                    "既往症": medical, "賞罰": rewards
                 },
                 "environment": {
-                    "家族構成": family,
-                    "恋人の有無": love,
-                    "趣味": hobby,
-                    "嗜好": habits
+                    "家族構成": family, "恋人の有無": love, "趣味": hobby, "嗜好": habits
                 },
-                "personality": {
-                    "長所": strengths,
-                    "短所": weaknesses
-                },
-                "emotions": {
-                    q_joy: ans_joy,
-                    q_sad: ans_sad,
-                    q_anger: ans_anger,
-                    q_fun: ans_fun,
-                    q_suf: ans_suf
-                },
-                "story_role": {
-                    q_role1: ans_role1,
-                    q_role2: ans_role2,
-                    q_role3: ans_role3,
-                    q_role4: ans_role4
-                },
-                "others": {
-                    "note": ans_other
-                }
+                "personality": {"長所": strengths, "短所": weaknesses},
+                "emotions": {q_joy: ans_joy, q_sad: ans_sad, q_anger: ans_anger, q_fun: ans_fun, q_suf: ans_suf},
+                "story_role": {q_role1: ans_role1, q_role2: ans_role2, q_role3: ans_role3, q_role4: ans_role4},
+                "others": {"note": ans_other}
             }
             
-            # Googleに保存
             success = google_db.save_character(target_id, full_data)
             
             if success:
                 st.success("保存完了！")
-                st.cache_data.clear() # キャッシュクリア
-                
-                # ★ここを変更！直接 current_mode を変えるのではなく、フラグを立てる
+                st.cache_data.clear() 
                 st.session_state.save_success_flag = True
-                
                 load_data() 
-                st.rerun() # リロード（リロード後、一番上でフラグを検知して画面が切り替わる）
+                st.rerun() 
             else:
                 st.error("保存に失敗しました。接続設定を確認してください。")
