@@ -1,4 +1,5 @@
 import gspread
+from gspread.exceptions import CellNotFound  # ★ここを追加！
 from oauth2client.service_account import ServiceAccountCredentials
 import json
 import datetime
@@ -6,7 +7,7 @@ import streamlit as st
 import os
 
 # ★ここにスプレッドシートのID（URLの /d/ と /edit の間の文字列）を貼る
-# ※もしIDが消えていたら、もう一度貼ってね！
+# ※IDが消えていないか確認してね！
 SPREADSHEET_KEY = "1l_Fb9McFOb9FZhpsOqIZNmtbCyh0YHlppQ9pF_2kDrY"
 
 # 認証スコープ
@@ -61,14 +62,19 @@ def save_character(char_id, full_data):
     image_url = full_data.get("profile", {}).get("image_file", "")
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     json_str = json.dumps(full_data, ensure_ascii=False)
+    
     try:
+        # IDを探す
         cell = sheet.find(str(char_id), in_column=1)
+        # 見つかったら更新
         row_idx = cell.row
         sheet.update_cell(row_idx, 2, name)
         sheet.update_cell(row_idx, 3, image_url)
         sheet.update_cell(row_idx, 4, now)
         sheet.update_cell(row_idx, 5, json_str)
-    # ★ここを修正しました！ (exceptions を削除)
-    except gspread.CellNotFound:
+        
+    except CellNotFound:  # ★ここを修正！シンプルにこれだけでOK
+        # 見つからなかったら新規追加
         sheet.append_row([str(char_id), name, image_url, now, json_str])
+        
     return True
