@@ -42,17 +42,37 @@ def go_to_edit(char_id):
     st.session_state.editing_id = char_id
     st.session_state.current_mode = "既存キャラの編集"
 
-# 画像URL変換関数
+# ★強力版：GoogleドライブのURL変換関数
 def format_image_url(url):
     if not url: return None
-    if "drive.google.com" in url and "/d/" in url:
+    
+    # すでに変換済みのURL（uc?id=...）ならそのまま返す
+    if "drive.google.com/uc?id=" in url:
+        return url
+        
+    file_id = None
+    
+    # パターン1: .../file/d/【ID】/... の形
+    if "/d/" in url:
         try:
             file_id = url.split("/d/")[1].split("/")[0]
-            return f"https://drive.google.com/uc?id={file_id}"
         except:
-            return url
+            pass
+            
+    # パターン2: ...?id=【ID】... の形
+    elif "id=" in url:
+        try:
+            file_id = url.split("id=")[1].split("&")[0]
+        except:
+            pass
+            
+    # IDが取れたら、表示用のリンクを作って返す
+    if file_id:
+        # export=view をつけるのがコツ
+        return f"https://drive.google.com/uc?export=view&id={file_id}"
+        
+    # どうしても解析できなかったら元のまま返す
     return url
-
 # --- サイドバー ---
 st.sidebar.header("メニュー")
 
