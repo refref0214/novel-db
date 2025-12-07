@@ -1,5 +1,4 @@
 import gspread
-from gspread.exceptions import CellNotFound  # ★ここを追加！
 from oauth2client.service_account import ServiceAccountCredentials
 import json
 import datetime
@@ -63,18 +62,19 @@ def save_character(char_id, full_data):
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     json_str = json.dumps(full_data, ensure_ascii=False)
     
-    try:
-        # IDを探す
-        cell = sheet.find(str(char_id), in_column=1)
-        # 見つかったら更新
+    # ★ここを最新版(v6)の書き方に変更！
+    # try-except は使いません。「cell があるかないか」で判定します。
+    cell = sheet.find(str(char_id), in_column=1)
+
+    if cell:
+        # 見つかった場合（更新）
         row_idx = cell.row
         sheet.update_cell(row_idx, 2, name)
         sheet.update_cell(row_idx, 3, image_url)
         sheet.update_cell(row_idx, 4, now)
         sheet.update_cell(row_idx, 5, json_str)
-        
-    except CellNotFound:  # ★ここを修正！シンプルにこれだけでOK
-        # 見つからなかったら新規追加
+    else:
+        # 見つからなかった場合（新規追加）
         sheet.append_row([str(char_id), name, image_url, now, json_str])
         
     return True
