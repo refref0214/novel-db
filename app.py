@@ -102,7 +102,8 @@ if operation == "全キャラ一覧":
                 "ID": c["ID"],
                 "氏名": c["氏名"],
                 "年齢": prof.get("age_info", ""),
-                "画像": c["画像URL"]
+                "画像": c["画像URL"],
+                "画像2": prof.get("image_file2", "")
             })
         df_all = pd.DataFrame(df_list)
 
@@ -135,6 +136,12 @@ if operation == "全キャラ一覧":
                         st.image(img_url, use_container_width=True)
                     else:
                         st.markdown("""<div style="height:100px;background:#eee;color:#888;display:flex;align-items:center;justify_content:center;">No Image</div>""", unsafe_allow_html=True)
+
+                    # 2枚目の画像を表示
+                    img_url2 = format_image_url(char["画像2"])
+                    if img_url2:
+                        st.image(img_url2, use_container_width=True)
+
                     st.markdown(f"**{char['氏名']}**")
                     st.button("編集", key=f"btn_{char['ID']}", on_click=go_to_edit, args=(char["ID"],))
 
@@ -196,14 +203,26 @@ else:
         with col1:
             st.markdown("#### 顔写真")
             st.caption("※Googleドライブの共有リンクを貼ってください")
-            image_input = st.text_input("画像URL", value=get_val(["profile"], "image_file", ""))
-            
+            image_input = st.text_input("画像URL (1枚目)", value=get_val(["profile"], "image_file", ""))
+
             image_url = format_image_url(image_input)
 
             if image_url:
-                st.image(image_url, use_container_width=True, caption="プレビュー")
+                st.image(image_url, use_container_width=True, caption="プレビュー (1枚目)")
                 # ★デバッグ用にURLを表示（うまくいったら消してOK）
                 st.caption(f"Debug: {image_url}")
+            else:
+                st.info("画像なし")
+
+            # 2枚目の画像
+            st.markdown("---")
+            image_input2 = st.text_input("画像URL (2枚目)", value=get_val(["profile"], "image_file2", ""))
+
+            image_url2 = format_image_url(image_input2)
+
+            if image_url2:
+                st.image(image_url2, use_container_width=True, caption="プレビュー (2枚目)")
+                st.caption(f"Debug: {image_url2}")
             else:
                 st.info("画像なし")
 
@@ -328,7 +347,7 @@ else:
 
             full_data = {
                 "profile": {
-                    "name": name, "kana": kana, "image_file": image_input,
+                    "name": name, "kana": kana, "image_file": image_input, "image_file2": image_input2,
                     "age_info": age_info, "gender": gender, "address": address,
                 },
                 "licenses": clean_licenses,
